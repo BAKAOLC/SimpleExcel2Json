@@ -1,4 +1,5 @@
-﻿using CommandLine;
+﻿using System.Text;
+using CommandLine;
 using Newtonsoft.Json.Linq;
 using OfficeOpenXml;
 
@@ -31,6 +32,10 @@ Task BeginParseExcel(Options options)
     var jsonArray = new JArray();
     resultJson["data"] = jsonArray;
     var headers = new string[worksheet.Dimension.Columns];
+
+    var recordExceptions = new List<string>();
+    var success = true;
+
     for (var row = beginRow; row <= worksheet.Dimension.Rows; row++)
     {
         if (row == beginRow)
@@ -42,17 +47,76 @@ Task BeginParseExcel(Options options)
             continue;
         }
 
+        if (!success)
+        {
+            for (var col = 1; col <= worksheet.Dimension.Columns; col++)
+                try
+                {
+                    CheckValue(worksheet.Cells[row, col].Text);
+                }
+                catch (Exception ex)
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"Row {row} Column {col}: {worksheet.Cells[row, col].Text}");
+                    sb.AppendLine(ex.Message);
+                    recordExceptions.Add(sb.ToString());
+                }
+
+            continue;
+        }
+
         var data = new JObject();
         for (var col = 1; col <= worksheet.Dimension.Columns; col++)
-            data[headers[col - 1]] = CheckValue(worksheet.Cells[row, col].Text);
+        {
+            if (!success)
+            {
+                try
+                {
+                    CheckValue(worksheet.Cells[row, col].Text);
+                }
+                catch (Exception ex)
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"Row {row} Column {col}: {worksheet.Cells[row, col].Text}");
+                    sb.AppendLine(ex.Message);
+                    recordExceptions.Add(sb.ToString());
+                }
+
+                continue;
+            }
+
+            try
+            {
+                data[headers[col - 1]] = CheckValue(worksheet.Cells[row, col].Text);
+            }
+            catch (Exception ex)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine($"Row {row} Column {col}: {worksheet.Cells[row, col].Text}");
+                sb.AppendLine(ex.Message);
+                recordExceptions.Add(sb.ToString());
+                success = false;
+            }
+        }
 
         Console.WriteLine($"Row {row - beginRow + 1}: " + data);
 
-        jsonArray.Add(data);
+        if (success) jsonArray.Add(data);
     }
 
-    Console.WriteLine("Writing to file: " + Path.GetFullPath(options.OutputFile));
-    File.WriteAllText(options.OutputFile, resultJson.ToString());
+    if (success)
+    {
+        Console.WriteLine("All rows parsed successfully.");
+        Console.WriteLine("Writing to file: " + Path.GetFullPath(options.OutputFile));
+        File.WriteAllText(options.OutputFile, resultJson.ToString());
+    }
+    else
+    {
+        Console.WriteLine("Errors occurred while parsing the following rows:");
+        foreach (var recordException in recordExceptions)
+            Console.WriteLine(recordException);
+    }
+
     return Task.CompletedTask;
 }
 
