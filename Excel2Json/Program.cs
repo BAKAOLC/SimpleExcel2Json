@@ -51,7 +51,7 @@ void ProcessDirectory(Options options)
         outputDir.Create();
     }
 
-    var metaFile = options.MetaFile ?? Path.Combine(inputDir.Parent?.FullName ?? string.Empty, ".e2jmeta");
+    var metaFile = options.MetaFile;
     var metaInfo = FileMetaInfo.Load(metaFile);
     var excelFiles = inputDir.GetFiles("*.xlsx", SearchOption.AllDirectories);
 
@@ -167,8 +167,6 @@ void ProcessSingleFile(Options options)
                 var cell = worksheet.Cells[row, headCol];
                 headers[headCol - 1] = cell?.Text ?? $"Column{headCol}";
             }
-
-            Console.WriteLine("表头: " + string.Join(", ", headers));
             continue;
         }
 
@@ -192,7 +190,6 @@ void ProcessSingleFile(Options options)
 
         if (success)
         {
-            Console.WriteLine($"行 {row - beginRow + 1}: " + data);
             jsonArray.Add(data);
         }
     }
