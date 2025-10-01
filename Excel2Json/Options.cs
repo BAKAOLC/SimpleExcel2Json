@@ -13,8 +13,17 @@ public class Options
     [Option('m', "meta", Required = false, HelpText = "元数据文件路径，默认为当前目录下的.e2jmeta文件")]
     public string MetaFile { get; set; } = Path.Combine(Directory.GetCurrentDirectory(), ".e2jmeta");
 
-    [Option('r', "row", Required = false, HelpText = "开始读取数据的行号，默认为2")]
-    public int BeginRow { get; set; } = 2;
+    [Option('r', "row", Required = false, HelpText = "开始读取数据的行号，默认为4")]
+    public int BeginRow { get; set; } = 4;
+
+    [Option("header-row", Required = false, HelpText = "表头行号，默认为2")]
+    public int HeaderRow { get; set; } = 2;
+
+    [Option("type-row", Required = false, HelpText = "类型标识行号，默认为3")]
+    public int TypeRow { get; set; } = 3;
+
+    [Option("include-meta", Required = false, HelpText = "是否将表头和数据类型加入到表内，默认为false")]
+    public bool IncludeMeta { get; set; } = false;
 
     public bool IsDirectoryMode => Directory.Exists(InputFile);
 }

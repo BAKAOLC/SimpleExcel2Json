@@ -83,7 +83,10 @@ void ProcessDirectory(Options options)
                 {
                     InputFile = excelFile.FullName,
                     OutputFile = outputPath,
-                    BeginRow = options.BeginRow
+                    BeginRow = options.BeginRow,
+                    HeaderRow = options.HeaderRow,
+                    TypeRow = options.TypeRow,
+                    IncludeMeta = options.IncludeMeta
                 };
 
                 ProcessSingleFile(fileOptions);
@@ -115,7 +118,7 @@ void ProcessSingleFile(Options options)
     var worksheet = package.Workbook.Worksheets[0] ?? throw new InvalidOperationException("工作表中没有数据");
     Console.WriteLine("读取工作表: " + worksheet.Name);
 
-    var (Success, Json, Errors) = ParseWorksheet(worksheet, options.BeginRow);
+    var (Success, Json, Errors) = ParseWorksheet(worksheet, options);
 
     if (Success)
     {
@@ -140,7 +143,7 @@ void ProcessSingleFile(Options options)
 }
 
 (bool Success, JObject Json, List<ProcessError> Errors) ParseWorksheet(
-    ExcelWorksheet worksheet, int beginRow)
+    ExcelWorksheet worksheet, Options options)
 {
     var resultJson = new JObject();
     var jsonArray = new JArray();
@@ -155,28 +158,54 @@ void ProcessSingleFile(Options options)
     }
 
     var headers = new string[worksheet.Dimension.Columns];
+    var types = new string[worksheet.Dimension.Columns];
     var recordExceptions = new List<ProcessError>();
     var success = true;
 
-    for (var row = beginRow; row <= worksheet.Dimension.Rows; row++)
+    // 读取表头
+    for (var headCol = 1; headCol <= worksheet.Dimension.Columns; headCol++)
     {
-        if (row == beginRow)
-        {
-            for (var headCol = 1; headCol <= worksheet.Dimension.Columns; headCol++)
-            {
-                var cell = worksheet.Cells[row, headCol];
-                headers[headCol - 1] = cell?.Text ?? $"Column{headCol}";
-            }
-            continue;
-        }
+        var headerCell = worksheet.Cells[options.HeaderRow, headCol];
+        headers[headCol - 1] = headerCell?.Text ?? $"Column{headCol}";
+    }
 
+    // 读取类型信息
+    for (var typeCol = 1; typeCol <= worksheet.Dimension.Columns; typeCol++)
+    {
+        var typeCell = worksheet.Cells[options.TypeRow, typeCol];
+        types[typeCol - 1] = typeCell?.Text ?? string.Empty;
+    }
+
+    // 如果需要包含元数据，先添加类型信息作为第一行数据
+    if (options.IncludeMeta)
+    {
+        var typeData = new JObject();
+        for (var col = 0; col < headers.Length; col++)
+        {
+            typeData[headers[col]] = types[col];
+        }
+        jsonArray.Add(typeData);
+    }
+
+    // 处理数据行
+    for (var row = options.BeginRow; row <= worksheet.Dimension.Rows; row++)
+    {
         var data = new JObject();
+        var hasData = false;
+
         for (var col = 1; col <= worksheet.Dimension.Columns; col++)
         {
             try
             {
                 var cell = worksheet.Cells[row, col];
-                data[headers[col - 1]] = ValueHelper.CheckValue(cell?.Text ?? string.Empty);
+                var cellValue = cell?.Text ?? string.Empty;
+                
+                if (!string.IsNullOrWhiteSpace(cellValue))
+                {
+                    hasData = true;
+                }
+
+                data[headers[col - 1]] = ValueHelper.CheckValue(cellValue);
             }
             catch (Exception ex)
             {
@@ -188,7 +217,8 @@ void ProcessSingleFile(Options options)
             }
         }
 
-        if (success)
+        // 只添加有数据的行
+        if (hasData)
         {
             jsonArray.Add(data);
         }
