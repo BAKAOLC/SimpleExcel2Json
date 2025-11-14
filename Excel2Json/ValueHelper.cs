@@ -9,9 +9,6 @@ public static class ValueHelper
         if (string.IsNullOrWhiteSpace(value))
             return string.Empty;
 
-        if (BBCodeHelper.IsBBCode(value))
-            return value;
-
         if (value.StartsWith("{") || value.StartsWith("["))
         {
             try
@@ -20,7 +17,7 @@ public static class ValueHelper
             }
             catch
             {
-                throw new ProcessWarningException("JSON解析失败，将作为普通字符串处理");
+                return value;
             }
         }
 
